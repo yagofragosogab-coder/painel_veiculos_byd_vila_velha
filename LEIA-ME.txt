@@ -1,0 +1,11 @@
+Painel de Veículos — como publicar no GitHub Pages
+
+Envie TODOS estes arquivos para o repositório (substituindo os antigos):
+  index.html
+  css/estilo.css
+  js/*.js   (componentes.js, shared.js, screens-overview.js, screens-cars.js, screen-servicos.js,
+             screen-detail.js, screens-admin.js, app.js, painel-config.js, importador.js, data-supabase.js)
+  assets/
+
+Os arquivos .jsx são só o código-fonte (para editar). O site usa os .js.
+Depois do deploy ficar verde no GitHub (aba Actions), abra o site e aperte Ctrl+F5.
