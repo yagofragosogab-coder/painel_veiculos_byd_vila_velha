@@ -112,6 +112,7 @@
     servs.forEach((x) => { const n = x.tipo === 'insulfilme' ? 'Insulfilme' : 'Emplacamento'; tags.push(x.status === 'concluido' ? { label: n + ' concluído', tone: 'ok', icon: 'circle-check' } : { label: n + ' pendente · ' + fmtDia(x.data_entrega), tone: 'warn', icon: x.tipo === 'insulfilme' ? 'sun-dim' : 'id-card' }); });
     if (v.bateria_recebimento != null) tags.push({ label: 'Bateria ' + v.bateria_recebimento + '% na chegada', tone: v.bateria_recebimento < 30 ? 'danger' : 'neutral', icon: v.bateria_recebimento < 30 ? 'battery-low' : v.bateria_recebimento < 70 ? 'battery-medium' : 'battery-full' });
     (v.situacao_chegada || []).forEach((t) => tags.push({ label: t, tone: 'warn', icon: 'clipboard-list' }));
+    if ((v.avarias || []).length) tags.push({ label: v.avarias.length === 1 ? '1 avaria registrada' : v.avarias.length + ' avarias registradas', tone: 'danger', icon: 'shield-alert' });
     if (v.flag_data_invalida) tags.push({ label: 'Data inválida na origem', tone: 'danger', icon: 'calendar-x' });
     if (!emFluxo) tags.push({ label: 'Base PDS · ainda fora do fluxo da loja', tone: 'neutral', icon: 'file-spreadsheet' });
     if (!v.encontrado_ultima_carga && v.origem_cadastro === 'pds') tags.push({ label: 'Não encontrado na última carga', tone: 'neutral', icon: 'file-question' });
@@ -263,7 +264,8 @@
         if (error) return /EXISTE/.test(error.message) ? fail('existe', 'Esse chassi já está no sistema. Abrimos o carro para você.') : fail('chassi', sbErr(error).message);
         return dataService.vehicles.get(chassi);
       },
-      async confirmarChegada(c, bateria, situacao) { const b = parseInt(bateria, 10); if (isNaN(b) || b < 0 || b > 100) return fail('bateria', 'Digite a bateria de 0 a 100.'); await rpc('confirmar_chegada', { p_chassi: c, p_bateria: b, p_situacao: situacao || [] }); return dataService.vehicles.get(c); },
+      async confirmarChegada(c, bateria, situacao, avarias) { const b = parseInt(bateria, 10); if (isNaN(b) || b < 0 || b > 100) return fail('bateria', 'Digite a bateria de 0 a 100.'); await rpc('confirmar_chegada', { p_chassi: c, p_bateria: b, p_situacao: situacao || [], p_avarias: avarias || [] }); return dataService.vehicles.get(c); },
+      async registrarAvaria(c, avarias) { await rpc('registrar_avaria', { p_chassi: c, p_avarias: avarias || [] }); return dataService.vehicles.get(c); },
       async enviarLavagem(c) { await rpc('enviar_lavagem', { p_chassi: c }); return dataService.vehicles.get(c); },
       async comecarPreparacao(c, prep) { await rpc('comecar_preparacao', { p_chassi: c, p_preparador: prep || session.id }); return dataService.vehicles.get(c); },
       async carroPronto(c) { await rpc('carro_pronto', { p_chassi: c }); return dataService.vehicles.get(c); },

@@ -56,6 +56,39 @@ function InfoGrid({
     }
   }, v || '—'))));
 }
+const AVARIA_TIPOS = ['Risco', 'Amassado', 'Trinca ou quebra', 'Peça solta ou faltando', 'Mancha ou pintura danificada', 'Vidro trincado', 'Farol ou lanterna danificado', 'Roda ou pneu danificado', 'Estofado ou interior danificado', 'Outro'];
+const AVARIA_LOCAIS = ['Para-choque dianteiro', 'Para-choque traseiro', 'Capô', 'Teto', 'Tampa do porta-malas', 'Porta dianteira esquerda', 'Porta dianteira direita', 'Porta traseira esquerda', 'Porta traseira direita', 'Para-lama dianteiro esquerdo', 'Para-lama dianteiro direito', 'Lateral traseira esquerda', 'Lateral traseira direita', 'Para-brisa', 'Vidro traseiro', 'Retrovisor esquerdo', 'Retrovisor direito', 'Roda dianteira esquerda', 'Roda dianteira direita', 'Roda traseira esquerda', 'Roda traseira direita', 'Interior', 'Outro'];
+const avariaVazia = () => ({ tipo: '', local: '', obs: '' });
+function avariasErro(lista) {
+  for (let i = 0; i < lista.length; i++) {
+    const a = lista[i], n = lista.length > 1 ? ' (avaria ' + (i + 1) + ')' : '';
+    if (!a.tipo) return 'Escolha o tipo da avaria' + n + '.';
+    if (!a.local) return 'Escolha o local da avaria' + n + '.';
+    if ((a.tipo === 'Outro' || a.local === 'Outro') && !a.obs.trim()) return 'Você escolheu "Outro". Descreva a avaria no campo de texto' + n + '.';
+  }
+  return null;
+}
+function avariaTxt(a) {
+  const tipo = a.tipo === 'Outro' ? (a.obs || 'Outro') : a.tipo;
+  const local = a.local === 'Outro' ? 'local descrito' : a.local;
+  return tipo + ' — ' + local;
+}
+function AvariaEditor({ value, onChange, opcional }) {
+  const { Select, TextField, Button, Icon } = DSNS;
+  const tem = value !== null;
+  const set = (i, k, x) => onChange(value.map((a, j) => j === i ? Object.assign({}, a, { [k]: x }) : a));
+  const pill = (on, label, icon, onClick) => React.createElement("button", { type: "button", "aria-pressed": on, onClick, style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, padding: '0 12px', borderRadius: 'var(--radius-md)', border: (on ? 2 : 1) + 'px solid ' + (on ? (icon === 'shield-alert' ? 'var(--danger-solid)' : 'var(--ok-solid)') : 'var(--border-strong)'), margin: on ? 0 : 1, background: on ? (icon === 'shield-alert' ? 'var(--danger-bg)' : 'var(--ok-bg)') : 'var(--surface-card)', color: on ? (icon === 'shield-alert' ? 'var(--danger-fg)' : 'var(--ok-fg)') : 'var(--text-1)', font: 'var(--fw-bold) var(--fs-body)/1.2 var(--font-sans)', cursor: 'pointer' } }, React.createElement(Icon, { name: icon, size: 20 }), label);
+  return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
+    opcional ? React.createElement(React.Fragment, null,
+      React.createElement("div", { style: { font: 'var(--type-label)' } }, "O carro tem avaria?"),
+      React.createElement("div", { style: { display: 'flex', gap: 8 } }, pill(!tem, 'Sem avaria', 'circle-check', () => onChange(null)), pill(tem, 'Tem avaria', 'shield-alert', () => onChange(tem ? value : [avariaVazia()])))) : null,
+    tem ? value.map((a, i) => React.createElement("div", { key: i, style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--danger-border)', background: 'var(--surface-card)' } },
+      value.length > 1 ? React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, React.createElement("b", null, "Avaria ", i + 1), React.createElement(Button, { size: "sm", variant: "ghost", icon: "trash-2", onClick: () => onChange(value.filter((x, j) => j !== i)) }, "Tirar")) : null,
+      React.createElement(Select, { label: "Qual avaria?", required: true, value: a.tipo, onChange: x => set(i, 'tipo', x), options: AVARIA_TIPOS }),
+      React.createElement(Select, { label: "Onde fica?", required: true, value: a.local, onChange: x => set(i, 'local', x), options: AVARIA_LOCAIS }),
+      React.createElement(TextField, { label: (a.tipo === 'Outro' || a.local === 'Outro') ? 'Descreva a avaria' : 'Detalhes (opcional)', required: a.tipo === 'Outro' || a.local === 'Outro', value: a.obs, onChange: x => set(i, 'obs', x.slice(0, 300)), placeholder: "Ex.: risco de 10 cm perto da maçaneta" }))) : null,
+    tem ? React.createElement(Button, { variant: "secondary", icon: "plus", onClick: () => onChange(value.concat([avariaVazia()])) }, "Adicionar outra avaria") : null);
+}
 function Detalhe({
   mobile,
   go,
@@ -94,6 +127,7 @@ function Detalhe({
   const [motivo, setMotivo] = React.useState('');
   const [bateria, setBateria] = React.useState('');
   const [sitCheg, setSitCheg] = React.useState([]);
+  const [avarias, setAvarias] = React.useState(null);
   const [err, setErr] = React.useState(null);
   const v = q.data;
   React.useEffect(() => {
@@ -124,12 +158,14 @@ function Detalhe({
     setErr(null);
     setBateria('');
     setSitCheg([]);
+    setAvarias(null);
     if (v.etapa === 'pronto') setEntregador(v.schedule ? v.schedule.entregador_sugerido : '');
     setDlg('next');
   }
   function executar() {
     const fn = ds.vehicles[nx.verb];
-    const p = nx.verb === 'confirmarChegada' ? fn(v.chassi, bateria, sitCheg) : nx.verb === 'comecarPreparacao' ? fn(v.chassi, prep) : nx.verb === 'entregar' ? fn(v.chassi, entregador) : fn(v.chassi);
+    if (nx.verb === 'confirmarChegada' && avarias) { const ea = avariasErro(avarias); if (ea) { setErr(ea); return; } }
+    const p = nx.verb === 'confirmarChegada' ? fn(v.chassi, bateria, sitCheg, avarias || []) : nx.verb === 'comecarPreparacao' ? fn(v.chassi, prep) : nx.verb === 'entregar' ? fn(v.chassi, entregador) : fn(v.chassi);
     p.then(nv => {
       setDlg(null);
       const msg = {
@@ -141,6 +177,10 @@ function Detalhe({
       };
       toast(msg[nv.etapa]);
     }, e => setErr(e.message));
+  }
+  function salvarAvaria() {
+    const ea = avariasErro(avarias || []); if (ea) { setErr(ea); return; }
+    ds.vehicles.registrarAvaria(v.chassi, avarias).then(() => { setDlg(null); setAvarias(null); toast('Avaria registrada no ' + nome + '. Todos já conseguem ver.'); }, e => setErr(e.message));
   }
   function voltar() {
     ds.vehicles.voltarEtapa(v.chassi, motivo).then(nv => {
@@ -309,7 +349,7 @@ function Detalhe({
   }, React.createElement(Icon, {
     name: v.bateria_recebimento < 30 ? 'battery-low' : v.bateria_recebimento < 70 ? 'battery-medium' : 'battery-full',
     size: 22
-  }), "Bateria na chegada: ", v.bateria_recebimento, "%") : null, (v.situacao_chegada || []).length ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: 8, background: 'var(--warn-bg)', color: 'var(--warn-fg)', border: '1px solid var(--warn-border)' } }, React.createElement("b", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement(Icon, { name: "clipboard-list", size: 20 }), "Situa\xE7\xE3o na chegada"), v.situacao_chegada.map(t => React.createElement("span", { key: t }, "\u2022 ", t))) : null, React.createElement("div", {
+  }), "Bateria na chegada: ", v.bateria_recebimento, "%") : null, (v.situacao_chegada || []).length ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: 8, background: 'var(--warn-bg)', color: 'var(--warn-fg)', border: '1px solid var(--warn-border)' } }, React.createElement("b", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement(Icon, { name: "clipboard-list", size: 20 }), "Situa\xE7\xE3o na chegada"), v.situacao_chegada.map(t => React.createElement("span", { key: t }, "\u2022 ", t))) : null, (v.avarias || []).length ? React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 6, padding: '10px 12px', borderRadius: 8, background: 'var(--danger-bg)', color: 'var(--danger-fg)', border: '1px solid var(--danger-border)' } }, React.createElement("b", { style: { display: 'flex', alignItems: 'center', gap: 6 } }, React.createElement(Icon, { name: "shield-alert", size: 20 }), v.avarias.length === 1 ? 'Avaria registrada' : v.avarias.length + ' avarias registradas'), v.avarias.map((a, i) => React.createElement("div", { key: i, style: { display: 'flex', flexDirection: 'column' } }, React.createElement("span", { style: { fontWeight: 700 } }, "\u2022 ", avariaTxt(a)), a.obs && a.tipo !== 'Outro' ? React.createElement("span", { style: { color: 'var(--text-1)' } }, a.obs) : null, a.local === 'Outro' && a.tipo !== 'Outro' ? null : null, React.createElement("span", { style: { color: 'var(--text-2)', fontSize: 14 } }, (a.por || '') + (a.em ? ' · ' + ds.fmt(new Date(a.em)) : ''))))) : null, v.etapa !== 'previsto' && v.etapa !== 'entregue' ? React.createElement("div", null, React.createElement(Button, { variant: "secondary", size: "sm", icon: "shield-alert", onClick: () => { setErr(null); setAvarias([avariaVazia()]); setDlg('avaria'); } }, "Registrar avaria")) : null, React.createElement("div", {
     style: {
       display: 'flex',
       gap: 8,
@@ -418,7 +458,7 @@ function Detalhe({
       style: { display: 'flex', alignItems: 'center', gap: 12, minHeight: 56, padding: '10px 14px', textAlign: 'left', background: on ? 'var(--warn-bg)' : 'var(--surface-card)', border: (on ? 2 : 1) + 'px solid ' + (on ? 'var(--warn-solid)' : 'var(--border-default)'), margin: on ? 0 : 1, borderRadius: 'var(--radius-md)', cursor: 'pointer', font: 'var(--type-body)', color: 'var(--text-1)' } },
       React.createElement("span", { style: { width: 24, height: 24, flex: 'none', borderRadius: 6, border: '2px solid ' + (on ? 'var(--warn-solid)' : 'var(--border-strong)'), background: on ? 'var(--warn-solid)' : '#fff', display: 'grid', placeItems: 'center', color: '#fff' } }, on ? React.createElement(Icon, { name: "check", size: 16, strokeWidth: 3 }) : null),
       React.createElement("span", { style: { flex: 1, fontWeight: on ? 700 : 400 } }, t)); }),
-    React.createElement("div", { style: { color: 'var(--text-2)', fontSize: 14 } }, "Pode marcar mais de uma. Se estiver tudo certo, deixe em branco."))) : null, v.etapa === 'loja' ? React.createElement("div", null, "O carro vai para \u201CDeixado para lavar no Shopping Praia da Costa\u201D. ", (v.servicos || []).some(x => x.tipo === 'emplacamento' && x.status === 'pendente') ? 'Lembrete: o emplacamento pode ser feito antes da lavagem.' : '') : null, v.etapa === 'lavagem' ? React.createElement(Select, {
+    React.createElement("div", { style: { color: 'var(--text-2)', fontSize: 14 } }, "Pode marcar mais de uma. Se estiver tudo certo, deixe em branco.")), React.createElement(AvariaEditor, { value: avarias, onChange: x => { setAvarias(x); setErr(null); }, opcional: true })) : null, v.etapa === 'loja' ? React.createElement("div", null, "O carro vai para \u201CDeixado para lavar no Shopping Praia da Costa\u201D. ", (v.servicos || []).some(x => x.tipo === 'emplacamento' && x.status === 'pendente') ? 'Lembrete: o emplacamento pode ser feito antes da lavagem.' : '') : null, v.etapa === 'lavagem' ? React.createElement(Select, {
     label: "Quem vai preparar?",
     value: prep,
     onChange: setPrep,
@@ -440,7 +480,7 @@ function Detalhe({
       color: 'var(--danger-fg)',
       fontWeight: 700
     }
-  }, err) : null) : null, dlg === 'voltar' ? React.createElement(Dialog, {
+  }, err) : null) : null, dlg === 'avaria' ? React.createElement(Dialog, { mobile: mobile, icon: "shield-alert", tone: "danger", onClose: () => setDlg(null), title: 'Registrar avaria no ' + nome, actions: React.createElement(React.Fragment, null, React.createElement(Button, { variant: "secondary", onClick: () => setDlg(null) }, "Cancelar"), React.createElement(Button, { variant: "danger", icon: "check", onClick: salvarAvaria }, "Salvar avaria")) }, React.createElement("div", null, "Use quando achar uma avaria depois da chegada, por exemplo depois da lavagem."), React.createElement(AvariaEditor, { value: avarias || [avariaVazia()], onChange: x => { setAvarias(x); setErr(null); } }), err ? React.createElement("div", { style: { color: 'var(--danger-fg)', fontWeight: 700 } }, err) : null) : null, dlg === 'voltar' ? React.createElement(Dialog, {
     mobile: mobile,
     icon: "undo-2",
     tone: "danger",
