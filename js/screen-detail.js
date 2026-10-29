@@ -59,6 +59,7 @@ function InfoGrid({
 const AVARIA_TIPOS = ['Risco', 'Amassado', 'Trinca ou quebra', 'Peça solta ou faltando', 'Mancha ou pintura danificada', 'Vidro trincado', 'Farol ou lanterna danificado', 'Roda ou pneu danificado', 'Estofado ou interior danificado', 'Outro'];
 const AVARIA_LOCAIS = ['Para-choque dianteiro', 'Para-choque traseiro', 'Capô', 'Teto', 'Tampa do porta-malas', 'Porta dianteira esquerda', 'Porta dianteira direita', 'Porta traseira esquerda', 'Porta traseira direita', 'Para-lama dianteiro esquerdo', 'Para-lama dianteiro direito', 'Lateral traseira esquerda', 'Lateral traseira direita', 'Para-brisa', 'Vidro traseiro', 'Retrovisor esquerdo', 'Retrovisor direito', 'Roda dianteira esquerda', 'Roda dianteira direita', 'Roda traseira esquerda', 'Roda traseira direita', 'Interior', 'Outro'];
 const avariaVazia = () => ({ tipo: '', local: '', obs: '' });
+const avariasPreenchidas = (l) => (l || []).filter((a) => (a.obs || '').trim());
 function avariasErro(lista) {
   for (let i = 0; i < lista.length; i++) {
     const a = lista[i], n = lista.length > 1 ? ' (avaria ' + (i + 1) + ')' : '';
@@ -69,25 +70,22 @@ function avariasErro(lista) {
   return null;
 }
 function avariaTxt(a) {
+  if (a.tipo === 'Outro' && a.local === 'Outro') return a.obs || 'Avaria';
   const tipo = a.tipo === 'Outro' ? (a.obs || 'Outro') : a.tipo;
   const local = a.local === 'Outro' ? 'local descrito' : a.local;
   return tipo + ' — ' + local;
 }
 function AvariaEditor({ value, onChange, opcional }) {
-  const { Select, TextField, Button, Icon } = DSNS;
-  const tem = value !== null;
-  const set = (i, k, x) => onChange(value.map((a, j) => j === i ? Object.assign({}, a, { [k]: x }) : a));
-  const pill = (on, label, icon, onClick) => React.createElement("button", { type: "button", "aria-pressed": on, onClick, style: { flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 48, padding: '0 12px', borderRadius: 'var(--radius-md)', border: (on ? 2 : 1) + 'px solid ' + (on ? (icon === 'shield-alert' ? 'var(--danger-solid)' : 'var(--ok-solid)') : 'var(--border-strong)'), margin: on ? 0 : 1, background: on ? (icon === 'shield-alert' ? 'var(--danger-bg)' : 'var(--ok-bg)') : 'var(--surface-card)', color: on ? (icon === 'shield-alert' ? 'var(--danger-fg)' : 'var(--ok-fg)') : 'var(--text-1)', font: 'var(--fw-bold) var(--fs-body)/1.2 var(--font-sans)', cursor: 'pointer' } }, React.createElement(Icon, { name: icon, size: 20 }), label);
-  return React.createElement("div", { style: { display: 'flex', flexDirection: 'column', gap: 10 } },
-    opcional ? React.createElement(React.Fragment, null,
-      React.createElement("div", { style: { font: 'var(--type-label)' } }, "O carro tem avaria?"),
-      React.createElement("div", { style: { display: 'flex', gap: 8 } }, pill(!tem, 'Sem avaria', 'circle-check', () => onChange(null)), pill(tem, 'Tem avaria', 'shield-alert', () => onChange(tem ? value : [avariaVazia()])))) : null,
-    tem ? value.map((a, i) => React.createElement("div", { key: i, style: { display: 'flex', flexDirection: 'column', gap: 10, padding: 12, borderRadius: 'var(--radius-md)', border: '1px solid var(--danger-border)', background: 'var(--surface-card)' } },
-      value.length > 1 ? React.createElement("div", { style: { display: 'flex', justifyContent: 'space-between', alignItems: 'center' } }, React.createElement("b", null, "Avaria ", i + 1), React.createElement(Button, { size: "sm", variant: "ghost", icon: "trash-2", onClick: () => onChange(value.filter((x, j) => j !== i)) }, "Tirar")) : null,
-      React.createElement(Select, { label: "Qual avaria?", required: true, value: a.tipo, onChange: x => set(i, 'tipo', x), options: AVARIA_TIPOS }),
-      React.createElement(Select, { label: "Onde fica?", required: true, value: a.local, onChange: x => set(i, 'local', x), options: AVARIA_LOCAIS }),
-      React.createElement(TextField, { label: (a.tipo === 'Outro' || a.local === 'Outro') ? 'Descreva a avaria' : 'Detalhes (opcional)', required: a.tipo === 'Outro' || a.local === 'Outro', value: a.obs, onChange: x => set(i, 'obs', x.slice(0, 300)), placeholder: "Ex.: risco de 10 cm perto da maçaneta" }))) : null,
-    tem ? React.createElement(Button, { variant: "secondary", icon: "plus", onClick: () => onChange(value.concat([avariaVazia()])) }, "Adicionar outra avaria") : null);
+  const { TextField } = DSNS;
+  const txt = (Array.isArray(value) && value[0] && value[0].obs) || '';
+  return React.createElement(TextField, {
+    label: opcional ? "Avaria (se tiver)" : "Avaria",
+    required: !opcional,
+    value: txt,
+    onChange: x => onChange([{ tipo: 'Outro', local: 'Outro', obs: x.slice(0, 300) }]),
+    placeholder: "Ex.: risco na porta traseira direita",
+    hint: opcional ? "Escreva qual é a avaria e onde fica. Se não tiver avaria, deixe em branco." : "Escreva qual é a avaria e onde fica."
+  });
 }
 function Detalhe({
   mobile,
@@ -127,7 +125,7 @@ function Detalhe({
   const [motivo, setMotivo] = React.useState('');
   const [bateria, setBateria] = React.useState('');
   const [sitCheg, setSitCheg] = React.useState([]);
-  const [avarias, setAvarias] = React.useState(null);
+  const [avarias, setAvarias] = React.useState([avariaVazia()]);
   const [err, setErr] = React.useState(null);
   const v = q.data;
   React.useEffect(() => {
@@ -158,14 +156,15 @@ function Detalhe({
     setErr(null);
     setBateria('');
     setSitCheg([]);
-    setAvarias(null);
+    setAvarias([avariaVazia()]);
     if (v.etapa === 'pronto') setEntregador(v.schedule ? v.schedule.entregador_sugerido : '');
     setDlg('next');
   }
   function executar() {
     const fn = ds.vehicles[nx.verb];
-    if (nx.verb === 'confirmarChegada' && avarias) { const ea = avariasErro(avarias); if (ea) { setErr(ea); return; } }
-    const p = nx.verb === 'confirmarChegada' ? fn(v.chassi, bateria, sitCheg, avarias || []) : nx.verb === 'comecarPreparacao' ? fn(v.chassi, prep) : nx.verb === 'entregar' ? fn(v.chassi, entregador) : fn(v.chassi);
+    const avOk = avariasPreenchidas(avarias);
+    if (nx.verb === 'confirmarChegada') { const ea = avariasErro(avOk); if (ea) { setErr(ea); return; } }
+    const p = nx.verb === 'confirmarChegada' ? fn(v.chassi, bateria, sitCheg, avOk) : nx.verb === 'comecarPreparacao' ? fn(v.chassi, prep) : nx.verb === 'entregar' ? fn(v.chassi, entregador) : fn(v.chassi);
     p.then(nv => {
       setDlg(null);
       const msg = {
@@ -179,8 +178,9 @@ function Detalhe({
     }, e => setErr(e.message));
   }
   function salvarAvaria() {
-    const ea = avariasErro(avarias || []); if (ea) { setErr(ea); return; }
-    ds.vehicles.registrarAvaria(v.chassi, avarias).then(() => { setDlg(null); setAvarias(null); toast('Avaria registrada no ' + nome + '. Todos já conseguem ver.'); }, e => setErr(e.message));
+    const avOk = avariasPreenchidas(avarias); if (!avOk.length) { setErr('Escreva qual é a avaria e onde fica.'); return; }
+    const ea = avariasErro(avOk); if (ea) { setErr(ea); return; }
+    ds.vehicles.registrarAvaria(v.chassi, avOk).then(() => { setDlg(null); setAvarias([avariaVazia()]); toast('Avaria registrada no ' + nome + '. Todos já conseguem ver.'); }, e => setErr(e.message));
   }
   function voltar() {
     ds.vehicles.voltarEtapa(v.chassi, motivo).then(nv => {
